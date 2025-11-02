@@ -48,6 +48,17 @@
             color: #333;
         }
         
+        .file-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .file-info.warning {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        
         input[type="file"] {
             width: 100%;
             padding: 12px;
@@ -144,6 +155,7 @@
             justify-content: center;
             color: white;
             font-weight: 600;
+            font-size: 14px;
         }
         
         .status {
@@ -206,9 +218,9 @@
         }
 
         .alert {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
             padding: 12px;
             border-radius: 8px;
             margin-bottom: 20px;
@@ -220,24 +232,60 @@
             border-color: #ffeaa7;
             color: #856404;
         }
+
+        .checkbox-group {
+            margin-top: 15px;
+            padding: 12px;
+            background: #e7f3ff;
+            border-radius: 8px;
+            border: 1px solid #b3d9ff;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 10px;
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        }
+
+        .checkbox-item label {
+            margin: 0;
+            cursor: pointer;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎬 รวมภาพ + เสียง → วิดีโอ HD</h1>
         
-        <div class="alert">
-            ✅ <strong>รุ่นใหม่:</strong> ใช้งานได้บน GitHub Pages แล้ว! (แก้ปัญหา CORS)
+        <div class="alert warning">
+            ⚠️ <strong>สำคัญ:</strong> ไฟล์เสียงควรเล็กกว่า 50MB สำหรับประสิทธิภาพที่ดี<br>
+            💡 หากไฟล์ใหญ่ ให้เลือก "บีบอัดเสียงอัตโนมัติ" ด้านล่าง
         </div>
 
         <div class="file-input-group">
             <label>📷 เลือกไฟล์รูปภาพ:</label>
-            <input type="file" id="imageInput" accept="image/*">
+            <input type="file" id="imageInput" accept="image/*" onchange="checkImageSize()">
+            <div class="file-info" id="imageInfo"></div>
         </div>
         
         <div class="file-input-group">
             <label>🎵 เลือกไฟล์เสียง:</label>
-            <input type="file" id="audioInput" accept="audio/*">
+            <input type="file" id="audioInput" accept="audio/*" onchange="checkAudioSize()">
+            <div class="file-info" id="audioInfo"></div>
+        </div>
+
+        <div class="checkbox-group">
+            <div class="checkbox-item">
+                <input type="checkbox" id="compressAudio" checked>
+                <label for="compressAudio">🗜️ บีบอัดเสียงอัตโนมัติ (แนะนำสำหรับไฟล์ใหญ่ >50MB)</label>
+            </div>
         </div>
         
         <div class="settings-group">
@@ -296,8 +344,10 @@
         </div>
         
         <div class="info">
-            💡 <strong>หมายเหตุ:</strong> การแปลงทำงานบนเบราว์เซอร์ของคุณทั้งหมด ไม่มีการอัปโหลดไฟล์ไปเซิร์ฟเวอร์<br>
-            ⏱️ <strong>เวลา:</strong> 5 FPS ≈ 1-2 นาที | 24-25 FPS ≈ 3-5 นาที (ขึ้นกับความยาวเสียง)
+            💡 <strong>เคล็ดลับ:</strong> 
+            • FPS ต่ำ (5-10) = เร็วกว่า + ไฟล์เล็กกว่า<br>
+            • บีบอัดเสียง = ลดขนาดไฟล์ 80-90% โดยไม่เสียคุณภาพมาก<br>
+            • ไม่มีการอัปโหลดไฟล์ - ทำงานบนเครื่องคุณ 100%
         </div>
     </div>
 
@@ -307,6 +357,35 @@
 
         let ffmpeg = null;
         let isLoaded = false;
+
+        window.checkImageSize = function() {
+            const input = document.getElementById('imageInput');
+            const info = document.getElementById('imageInfo');
+            if (input.files[0]) {
+                const sizeMB = (input.files[0].size / 1024 / 1024).toFixed(2);
+                info.textContent = `ขนาด: ${sizeMB} MB`;
+                info.className = 'file-info';
+            }
+        }
+
+        window.checkAudioSize = function() {
+            const input = document.getElementById('audioInput');
+            const info = document.getElementById('audioInfo');
+            const checkbox = document.getElementById('compressAudio');
+            
+            if (input.files[0]) {
+                const sizeMB = (input.files[0].size / 1024 / 1024).toFixed(2);
+                info.textContent = `ขนาด: ${sizeMB} MB`;
+                
+                if (sizeMB > 50) {
+                    info.textContent += ' ⚠️ ไฟล์ใหญ่! แนะนำให้เปิด "บีบอัดอัตโนมัติ"';
+                    info.className = 'file-info warning';
+                    checkbox.checked = true;
+                } else {
+                    info.className = 'file-info';
+                }
+            }
+        }
 
         function log(message) {
             const logContainer = document.getElementById('logContainer');
@@ -332,7 +411,7 @@
         async function loadFFmpeg() {
             if (isLoaded) return;
             
-            log('🔄 กำลังโหลด FFmpeg.wasm (ครั้งแรกอาจใช้เวลา 10-30 วินาที)...');
+            log('🔄 กำลังโหลด FFmpeg.wasm...');
             updateProgress(5, 'กำลังดาวน์โหลด FFmpeg...');
             
             ffmpeg = new FFmpeg();
@@ -344,17 +423,18 @@
                 }
             });
             
-            ffmpeg.on('progress', ({ progress, time }) => {
-                const percent = 25 + (progress * 70);
-                updateProgress(percent, `กำลังประมวลผล... (${(progress * 100).toFixed(1)}%)`);
+            let lastProgress = 0;
+            ffmpeg.on('progress', ({ progress }) => {
+                if (progress - lastProgress > 0.05 || progress === 1) {
+                    const percent = 30 + (progress * 65);
+                    updateProgress(percent, `กำลังประมวลผล... ${(progress * 100).toFixed(0)}%`);
+                    lastProgress = progress;
+                }
             });
 
             try {
                 const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
                 
-                updateProgress(10, 'กำลังเตรียม Core files...');
-                
-                // Use unpkg directly without toBlobURL to avoid CORS
                 await ffmpeg.load({
                     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
                     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
@@ -363,9 +443,8 @@
                 
                 isLoaded = true;
                 log('✅ โหลด FFmpeg สำเร็จ!');
-                updateProgress(20, 'พร้อมแปลงไฟล์');
             } catch (error) {
-                log(`❌ Error loading FFmpeg: ${error.message}`);
+                log(`❌ Error: ${error.message}`);
                 throw error;
             }
         }
@@ -377,6 +456,7 @@
             const progressContainer = document.getElementById('progressContainer');
             const downloadLink = document.getElementById('downloadLink');
             const logContainer = document.getElementById('logContainer');
+            const compressAudio = document.getElementById('compressAudio').checked;
             
             if (!imageInput.files[0]) {
                 alert('❌ กรุณาเลือกไฟล์รูปภาพ');
@@ -386,6 +466,13 @@
             if (!audioInput.files[0]) {
                 alert('❌ กรุณาเลือกไฟล์เสียง');
                 return;
+            }
+            
+            const audioSizeMB = audioInput.files[0].size / 1024 / 1024;
+            if (audioSizeMB > 100 && !compressAudio) {
+                if (!confirm(`⚠️ ไฟล์เสียงขนาด ${audioSizeMB.toFixed(0)}MB อาจทำให้ browser ค้าง\n\nแนะนำให้เปิด "บีบอัดเสียงอัตโนมัติ"\n\nต้องการดำเนินการต่อหรือไม่?`)) {
+                    return;
+                }
             }
             
             try {
@@ -402,29 +489,50 @@
                 const resolution = document.querySelector('input[name="resolution"]:checked').value;
                 const fps = document.querySelector('input[name="fps"]:checked').value;
                 
-                log('📁 กำลังอ่านไฟล์...');
-                updateProgress(22, 'กำลังอ่านไฟล์...');
-                
                 const imageFile = imageInput.files[0];
                 const audioFile = audioInput.files[0];
                 
-                log(`📷 รูปภาพ: ${imageFile.name} (${(imageFile.size / 1024 / 1024).toFixed(2)} MB)`);
-                log(`🎵 เสียง: ${audioFile.name} (${(audioFile.size / 1024 / 1024).toFixed(2)} MB)`);
-                log(`🎞️ ความละเอียด: ${resolution.replace(':', 'x')} | FPS: ${fps}`);
+                log(`📷 รูป: ${imageFile.name} (${(imageFile.size/1024/1024).toFixed(2)} MB)`);
+                log(`🎵 เสียง: ${audioFile.name} (${(audioFile.size/1024/1024).toFixed(2)} MB)`);
                 
-                log('💾 เขียนไฟล์ลง virtual filesystem...');
+                updateProgress(15, 'กำลังโหลดไฟล์...');
+                
                 await ffmpeg.writeFile('input.jpg', await fetchFile(imageFile));
-                await ffmpeg.writeFile('input_audio.wav', await fetchFile(audioFile));
+                await ffmpeg.writeFile('input_audio_raw.wav', await fetchFile(audioFile));
                 
-                updateProgress(25, 'กำลังสร้างวิดีโอ (กรุณารอ)...');
-                log('🎬 เริ่ม encoding (อาจใช้เวลา 1-5 นาที ขึ้นกับ FPS และความยาวเสียง)...');
+                let audioFileName = 'input_audio_raw.wav';
+                
+                // Compress audio if enabled
+                if (compressAudio) {
+                    log('🗜️ กำลังบีบอัดเสียง (ลดขนาด 80-90%)...');
+                    updateProgress(20, 'กำลังบีบอัดเสียง...');
+                    
+                    await ffmpeg.exec([
+                        '-i', 'input_audio_raw.wav',
+                        '-c:a', 'aac',
+                        '-b:a', '128k',
+                        '-ar', '44100',
+                        'input_audio.m4a'
+                    ]);
+                    
+                    audioFileName = 'input_audio.m4a';
+                    
+                    const compressedData = await ffmpeg.readFile('input_audio.m4a');
+                    const compressedSizeMB = (compressedData.length / 1024 / 1024).toFixed(2);
+                    log(`✅ บีบอัดเสียงสำเร็จ: ${compressedSizeMB} MB (ลด ${((1 - compressedData.length/audioFile.size)*100).toFixed(0)}%)`);
+                    
+                    await ffmpeg.deleteFile('input_audio_raw.wav');
+                }
+                
+                updateProgress(30, 'กำลังสร้างวิดีโอ...');
+                log(`🎬 เริ่ม encoding (${resolution.replace(':', 'x')} @ ${fps}fps)...`);
                 
                 const [width, height] = resolution.split(':');
                 await ffmpeg.exec([
                     '-loop', '1',
                     '-framerate', fps,
                     '-i', 'input.jpg',
-                    '-i', 'input_audio.wav',
+                    '-i', audioFileName,
                     '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`,
                     '-c:v', 'libx264',
                     '-preset', 'ultrafast',
@@ -432,22 +540,21 @@
                     '-crf', '23',
                     '-r', fps,
                     '-pix_fmt', 'yuv420p',
-                    '-c:a', 'aac',
-                    '-b:a', '192k',
+                    '-c:a', 'copy',
                     '-shortest',
                     '-movflags', '+faststart',
                     'output.mp4'
                 ]);
                 
-                updateProgress(95, 'กำลังเตรียมไฟล์ดาวน์โหลด...');
+                updateProgress(95, 'เตรียมดาวน์โหลด...');
                 log('✅ สร้างวิดีโอสำเร็จ!');
                 
                 const data = await ffmpeg.readFile('output.mp4');
                 const blob = new Blob([data.buffer], { type: 'video/mp4' });
                 const url = URL.createObjectURL(blob);
                 
-                log(`📦 ขนาดไฟล์ output: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
-                log('🎉 เสร็จสิ้น! คลิกปุ่มด้านล่างเพื่อดาวน์โหลด');
+                log(`📦 ขนาดไฟล์: ${(blob.size/1024/1024).toFixed(2)} MB`);
+                log('🎉 เสร็จสิ้น!');
                 
                 const downloadBtn = downloadLink.querySelector('a');
                 downloadBtn.href = url;
@@ -457,16 +564,18 @@
                 updateProgress(100, '✅ สำเร็จ!');
                 
                 // Cleanup
-                log('🧹 ทำความสะอาดไฟล์ชั่วคราว...');
                 await ffmpeg.deleteFile('input.jpg');
-                await ffmpeg.deleteFile('input_audio.wav');
+                if (audioFileName === 'input_audio.m4a') {
+                    await ffmpeg.deleteFile('input_audio.m4a');
+                } else {
+                    await ffmpeg.deleteFile('input_audio_raw.wav');
+                }
                 await ffmpeg.deleteFile('output.mp4');
                 
             } catch (error) {
                 log('❌ ERROR: ' + error.message);
-                log('📋 Stack trace: ' + error.stack);
                 updateProgress(0, 'เกิดข้อผิดพลาด');
-                alert('เกิดข้อผิดพลาด: ' + error.message + '\n\nกรุณาลองใหม่อีกครั้ง หรือใช้ไฟล์ที่เล็กกว่า');
+                alert(`เกิดข้อผิดพลาด:\n${error.message}\n\nลองลดขนาดไฟล์ หรือปิดแท็บอื่นๆ`);
                 console.error(error);
             } finally {
                 convertBtn.disabled = false;
