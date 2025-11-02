@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>รวมภาพ + เสียง เป็นวิดีโอ HD</title>
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
     <style>
         * {
             margin: 0;
@@ -281,8 +280,10 @@
         </div>
     </div>
 
-    <script>
-        const { FFmpeg } = FFmpegWASM;
+    <script type="module">
+        import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js';
+        import { toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js';
+
         let ffmpeg = null;
         let isLoaded = false;
 
@@ -310,7 +311,7 @@
             if (isLoaded) return;
             
             log('[1/4] กำลังโหลด FFmpeg.wasm...');
-            updateProgress(10, 'กำลังโหลด FFmpeg...');
+            updateProgress(5, 'กำลังโหลด FFmpeg...');
             
             ffmpeg = new FFmpeg();
             
@@ -324,9 +325,14 @@
                 const percent = 25 + (progress * 70);
                 updateProgress(percent, 'กำลังประมวลผล...');
             });
+
+            const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+            
+            updateProgress(10, 'กำลังเตรียม Core...');
             
             await ffmpeg.load({
-                coreURL: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
+                coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
             });
             
             isLoaded = true;
@@ -334,7 +340,7 @@
             updateProgress(20, 'พร้อมแปลงไฟล์');
         }
 
-        async function startConvert() {
+        window.startConvert = async function() {
             const imageInput = document.getElementById('imageInput');
             const audioInput = document.getElementById('audioInput');
             const convertBtn = document.getElementById('convertBtn');
@@ -353,24 +359,20 @@
             }
             
             try {
-                // Reset UI
                 convertBtn.disabled = true;
                 progressContainer.classList.add('active');
                 downloadLink.classList.remove('active');
                 logContainer.innerHTML = '';
                 updateProgress(0, 'เริ่มต้น...');
                 
-                // Load FFmpeg
                 await loadFFmpeg();
                 
-                // Get settings
                 const resolution = document.querySelector('input[name="resolution"]:checked').value;
                 const fps = document.querySelector('input[name="fps"]:checked').value;
                 
                 log('[2/4] กำลังอ่านไฟล์...');
                 updateProgress(22, 'กำลังอ่านไฟล์...');
                 
-                // Read files
                 const imageFile = imageInput.files[0];
                 const audioFile = audioInput.files[0];
                 
@@ -382,7 +384,6 @@
                 log(`→ ความละเอียด: ${resolution.replace(':', 'x')}`);
                 log(`→ FPS: ${fps}`);
                 
-                // Write files to FFmpeg virtual file system
                 log('[3/4] เตรียมไฟล์...');
                 await ffmpeg.writeFile('input.jpg', new Uint8Array(imageData));
                 await ffmpeg.writeFile('input_audio.wav', new Uint8Array(audioData));
@@ -390,7 +391,6 @@
                 updateProgress(25, 'กำลังสร้างวิดีโอ...');
                 log('[4/4] กำลังสร้างวิดีโอ (อาจใช้เวลา 1-5 นาที)...');
                 
-                // Run FFmpeg command
                 const [width, height] = resolution.split(':');
                 await ffmpeg.exec([
                     '-loop', '1',
@@ -414,7 +414,6 @@
                 updateProgress(95, 'กำลังเตรียมไฟล์ดาวน์โหลด...');
                 log('✅ สร้างวิดีโอสำเร็จ!');
                 
-                // Read output file
                 const data = await ffmpeg.readFile('output.mp4');
                 const blob = new Blob([data.buffer], { type: 'video/mp4' });
                 const url = URL.createObjectURL(blob);
@@ -422,7 +421,6 @@
                 log(`📦 ขนาดไฟล์: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
                 log('🎉 เสร็จสิ้น! พร้อมดาวน์โหลด');
                 
-                // Setup download link
                 const downloadBtn = downloadLink.querySelector('a');
                 downloadBtn.href = url;
                 downloadBtn.download = `video_${Date.now()}.mp4`;
@@ -430,7 +428,6 @@
                 downloadLink.classList.add('active');
                 updateProgress(100, '✅ สำเร็จ!');
                 
-                // Cleanup
                 await ffmpeg.deleteFile('input.jpg');
                 await ffmpeg.deleteFile('input_audio.wav');
                 await ffmpeg.deleteFile('output.mp4');
