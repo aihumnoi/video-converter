@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>รวมภาพ + เสียง เป็นวิดีโอ HD</title>
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .file-input-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        input[type="file"]:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+        
+        .settings-group {
+            margin-bottom: 25px;
+        }
+        
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .radio-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9ff;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .radio-item:hover {
+            background: #e8ebff;
+        }
+        
+        .radio-item input[type="radio"] {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-top: 20px;
+        }
+        
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .progress-container {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .progress-container.active {
+            display: block;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .status {
+            text-align: center;
+            margin-top: 15px;
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .log-container {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1e1e1e;
+            border-radius: 10px;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .log-container.active {
+            display: block;
+        }
+        
+        .info {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #856404;
+        }
+        
+        .download-link {
+            display: none;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .download-link.active {
+            display: block;
+        }
+        
+        .download-link a {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        .download-link a:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 รวมภาพ + เสียง → วิดีโอ HD</h1>
+        
+        <div class="file-input-group">
+            <label>📷 เลือกไฟล์รูปภาพ:</label>
+            <input type="file" id="imageInput" accept="image/*">
+        </div>
+        
+        <div class="file-input-group">
+            <label>🎵 เลือกไฟล์เสียง:</label>
+            <input type="file" id="audioInput" accept="audio/*">
+        </div>
+        
+        <div class="settings-group">
+            <label>🎞️ ความละเอียด:</label>
+            <div class="radio-group">
+                <label class="radio-item">
+                    <input type="radio" name="resolution" value="1920:1080" checked>
+                    Full HD (1920x1080)
+                </label>
+                <label class="radio-item">
+                    <input type="radio" name="resolution" value="1280:720">
+                    HD (1280x720)
+                </label>
+                <label class="radio-item">
+                    <input type="radio" name="resolution" value="2560:1440">
+                    2K (2560x1440)
+                </label>
+            </div>
+        </div>
+        
+        <div class="settings-group">
+            <label>⚡ เฟรมเรท (FPS):</label>
+            <div class="radio-group">
+                <label class="radio-item">
+                    <input type="radio" name="fps" value="5" checked>
+                    5 FPS (เร็วมาก, ไฟล์เล็ก) ⭐ แนะนำ
+                </label>
+                <label class="radio-item">
+                    <input type="radio" name="fps" value="10">
+                    10 FPS (เร็ว, ไฟล์เล็ก)
+                </label>
+                <label class="radio-item">
+                    <input type="radio" name="fps" value="24">
+                    24 FPS (มาตรฐานภาพยนตร์)
+                </label>
+                <label class="radio-item">
+                    <input type="radio" name="fps" value="25">
+                    25 FPS (YouTube)
+                </label>
+            </div>
+        </div>
+        
+        <button id="convertBtn" onclick="startConvert()">🚀 สร้างวิดีโอ</button>
+        
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill">0%</div>
+            </div>
+            <div class="status" id="status">กำลังเตรียมการ...</div>
+        </div>
+        
+        <div class="log-container" id="logContainer"></div>
+        
+        <div class="download-link" id="downloadLink">
+            <a href="#" download="video.mp4">⬇️ ดาวน์โหลดวิดีโอ</a>
+        </div>
+        
+        <div class="info">
+            💡 <strong>หมายเหตุ:</strong> การแปลงทำงานบนเบราว์เซอร์ของคุณทั้งหมด ไม่มีการอัปโหลดไฟล์ไปเซิร์ฟเวอร์
+        </div>
+    </div>
+
+    <script>
+        const { FFmpeg } = FFmpegWASM;
+        let ffmpeg = null;
+        let isLoaded = false;
+
+        function log(message) {
+            const logContainer = document.getElementById('logContainer');
+            logContainer.classList.add('active');
+            logContainer.innerHTML += message + '<br>';
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(message);
+        }
+
+        function updateProgress(percentage, message) {
+            const progressFill = document.getElementById('progressFill');
+            const status = document.getElementById('status');
+            
+            progressFill.style.width = percentage + '%';
+            progressFill.textContent = Math.round(percentage) + '%';
+            
+            if (message) {
+                status.textContent = message;
+            }
+        }
+
+        async function loadFFmpeg() {
+            if (isLoaded) return;
+            
+            log('[1/4] กำลังโหลด FFmpeg.wasm...');
+            updateProgress(10, 'กำลังโหลด FFmpeg...');
+            
+            ffmpeg = new FFmpeg();
+            
+            ffmpeg.on('log', ({ message }) => {
+                if (message.includes('frame=') || message.includes('time=')) {
+                    log('→ ' + message);
+                }
+            });
+            
+            ffmpeg.on('progress', ({ progress }) => {
+                const percent = 25 + (progress * 70);
+                updateProgress(percent, 'กำลังประมวลผล...');
+            });
+            
+            await ffmpeg.load({
+                coreURL: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
+            });
+            
+            isLoaded = true;
+            log('✅ โหลด FFmpeg สำเร็จ!');
+            updateProgress(20, 'พร้อมแปลงไฟล์');
+        }
+
+        async function startConvert() {
+            const imageInput = document.getElementById('imageInput');
+            const audioInput = document.getElementById('audioInput');
+            const convertBtn = document.getElementById('convertBtn');
+            const progressContainer = document.getElementById('progressContainer');
+            const downloadLink = document.getElementById('downloadLink');
+            const logContainer = document.getElementById('logContainer');
+            
+            if (!imageInput.files[0]) {
+                alert('❌ กรุณาเลือกไฟล์รูปภาพ');
+                return;
+            }
+            
+            if (!audioInput.files[0]) {
+                alert('❌ กรุณาเลือกไฟล์เสียง');
+                return;
+            }
+            
+            try {
+                // Reset UI
+                convertBtn.disabled = true;
+                progressContainer.classList.add('active');
+                downloadLink.classList.remove('active');
+                logContainer.innerHTML = '';
+                updateProgress(0, 'เริ่มต้น...');
+                
+                // Load FFmpeg
+                await loadFFmpeg();
+                
+                // Get settings
+                const resolution = document.querySelector('input[name="resolution"]:checked').value;
+                const fps = document.querySelector('input[name="fps"]:checked').value;
+                
+                log('[2/4] กำลังอ่านไฟล์...');
+                updateProgress(22, 'กำลังอ่านไฟล์...');
+                
+                // Read files
+                const imageFile = imageInput.files[0];
+                const audioFile = audioInput.files[0];
+                
+                const imageData = await imageFile.arrayBuffer();
+                const audioData = await audioFile.arrayBuffer();
+                
+                log(`→ รูปภาพ: ${imageFile.name} (${(imageFile.size / 1024 / 1024).toFixed(2)} MB)`);
+                log(`→ เสียง: ${audioFile.name} (${(audioFile.size / 1024 / 1024).toFixed(2)} MB)`);
+                log(`→ ความละเอียด: ${resolution.replace(':', 'x')}`);
+                log(`→ FPS: ${fps}`);
+                
+                // Write files to FFmpeg virtual file system
+                log('[3/4] เตรียมไฟล์...');
+                await ffmpeg.writeFile('input.jpg', new Uint8Array(imageData));
+                await ffmpeg.writeFile('input_audio.wav', new Uint8Array(audioData));
+                
+                updateProgress(25, 'กำลังสร้างวิดีโอ...');
+                log('[4/4] กำลังสร้างวิดีโอ (อาจใช้เวลา 1-5 นาที)...');
+                
+                // Run FFmpeg command
+                const [width, height] = resolution.split(':');
+                await ffmpeg.exec([
+                    '-loop', '1',
+                    '-framerate', fps,
+                    '-i', 'input.jpg',
+                    '-i', 'input_audio.wav',
+                    '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`,
+                    '-c:v', 'libx264',
+                    '-preset', 'ultrafast',
+                    '-tune', 'stillimage',
+                    '-crf', '23',
+                    '-r', fps,
+                    '-pix_fmt', 'yuv420p',
+                    '-c:a', 'aac',
+                    '-b:a', '192k',
+                    '-shortest',
+                    '-movflags', '+faststart',
+                    'output.mp4'
+                ]);
+                
+                updateProgress(95, 'กำลังเตรียมไฟล์ดาวน์โหลด...');
+                log('✅ สร้างวิดีโอสำเร็จ!');
+                
+                // Read output file
+                const data = await ffmpeg.readFile('output.mp4');
+                const blob = new Blob([data.buffer], { type: 'video/mp4' });
+                const url = URL.createObjectURL(blob);
+                
+                log(`📦 ขนาดไฟล์: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+                log('🎉 เสร็จสิ้น! พร้อมดาวน์โหลด');
+                
+                // Setup download link
+                const downloadBtn = downloadLink.querySelector('a');
+                downloadBtn.href = url;
+                downloadBtn.download = `video_${Date.now()}.mp4`;
+                
+                downloadLink.classList.add('active');
+                updateProgress(100, '✅ สำเร็จ!');
+                
+                // Cleanup
+                await ffmpeg.deleteFile('input.jpg');
+                await ffmpeg.deleteFile('input_audio.wav');
+                await ffmpeg.deleteFile('output.mp4');
+                
+            } catch (error) {
+                log('❌ ERROR: ' + error.message);
+                updateProgress(0, 'เกิดข้อผิดพลาด');
+                alert('เกิดข้อผิดพลาด: ' + error.message);
+                console.error(error);
+            } finally {
+                convertBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
